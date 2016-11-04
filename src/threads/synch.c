@@ -68,7 +68,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered (&sema->waiters, &thread_current()->elem, in_thread_priority_order, NULL);
+      list_insert_ordered (&sema->waiters, &thread_current()->elem, (list_less_func*)&in_thread_priority_order, NULL);
       thread_block ();
     }
   sema->value--;
@@ -115,11 +115,12 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
   {
-    list_sort (&sema->waiters, in_thread_priority_order, NULL);
+    list_sort (&sema->waiters, (list_less_func*)&in_thread_priority_order, NULL);
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
   }
   sema->value++;
+  thread_yield ();
   intr_set_level (old_level);
 }
 
@@ -199,13 +200,20 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  /*  
+  sema_down (&lock->semaphore);
+  lock->holder = thread_current ();
+  */
+
+  //ZYQ
   struct thread* current_thread = thread_current();
 
   if (lock->holder != NULL && !thread_mlfqs)
   {
     /*
     Different threads want to acquire the lock
-    if the current_thread have higher priority    it would be inproper to wait for a lower priority thread to run
+    if the current_thread have higher priority 
+    it would be inproper to wait for a lower priority thread to run
     so higher priority should be donated to the thread with lower priority
     */
     struct lock* locker = lock;
@@ -234,6 +242,7 @@ lock_acquire (struct lock *lock)
   intr_set_level(old_level);
 }
 
+//ZYQ
 bool in_lock_priority_order(const struct list_elem *element,const struct list_elem *to_compare,void *aux)
 {
   return list_entry(element,struct lock,elem)->max_priority > list_entry(to_compare,struct lock,elem)->max_priority;
@@ -272,6 +281,8 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  //ZYQ
   if (!thread_mlfqs)
     thread_remove_lock (lock);
 }
@@ -358,7 +369,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) {
-    list_sort(&cond->waiters,in_cond_priority_order,NULL);
+    list_sort(&cond->waiters, (list_less_func*)&in_cond_priority_order,NULL);
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
   }

@@ -387,7 +387,7 @@ thread_set_priority (int new_priority)
     int old_priority = current_thread->priority;
     current_thread->origin_priority = new_priority;
 
-    if (list_empty (&current_thread->locks)/* || new_priority > old_priority*/)
+    if (list_empty (&current_thread->locks) || new_priority > old_priority)
     {
       current_thread->priority = new_priority;
       thread_yield ();
@@ -518,8 +518,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->origin_priority = t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+  //ZYQ
+  t->origin_priority = t->priority = priority;
   list_init(&t->locks);
   t->lock_waiting_for = NULL;
   //list_push_back (&all_list, &t->allelem);
@@ -641,6 +643,7 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
+//ZYQ
 void thread_donate(struct thread* t)
 {
   enum intr_level old_level = intr_disable();
@@ -649,7 +652,7 @@ void thread_donate(struct thread* t)
   if (t->status == THREAD_READY)
   {
     list_remove(&t->elem);
-    list_insert_ordered (&ready_list, &t->elem,  (list_less_func*)&in_thread_priority_order, NULL);
+    list_insert_ordered (&ready_list, &t->elem, (list_less_func*)&in_thread_priority_order, NULL);
   }
 
   intr_set_level(old_level);
@@ -663,7 +666,7 @@ void thread_update_priority(struct thread* t)
 
   if (!list_empty(&t->locks))
   {
-    list_sort(&t->locks,in_lock_priority_order,NULL);
+    list_sort(&t->locks,(list_less_func*)&in_lock_priority_order,NULL);
     int lock_priority = list_entry(list_front(&t->locks),struct lock,elem)->max_priority;
     if (lock_priority > max_priority)
       max_priority = lock_priority;
@@ -677,7 +680,7 @@ void thread_hold_lock(struct lock* lock)
 {
   enum intr_level old_level = intr_disable();
 
-  list_insert_ordered(&thread_current()->locks, &lock->elem, in_lock_priority_order, NULL);
+  list_insert_ordered(&thread_current()->locks, &lock->elem, (list_less_func*)&in_lock_priority_order, NULL);
   
   if (lock->max_priority > thread_current()->priority)
   {

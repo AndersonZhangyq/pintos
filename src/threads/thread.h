@@ -89,6 +89,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
 
+    //ZYQ
     int origin_priority;                /* Store the origin priority which equals priority before any donation. */
     struct list locks;                  /* All holding locks. */
     struct lock* lock_waiting_for;      /* The lock thread is waiting for. */
