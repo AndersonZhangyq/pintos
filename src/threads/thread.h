@@ -151,6 +151,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+//ZYQ
 void thread_update_priority(struct thread* t);
 void thread_donate(struct thread* t);
 void thread_hold_lock(struct lock* lock);
